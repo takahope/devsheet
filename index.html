@@ -1,0 +1,1597 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互動式系統開發表單</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- 備用 jsPDF CDN -->
+    <script>
+        // 如果主要 CDN 載入失敗，嘗試備用 CDN
+        if (typeof window.jsPDF === 'undefined') {
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js';
+            script.onload = function() {
+                console.log('jsPDF 已從備用 CDN 載入');
+            };
+            script.onerror = function() {
+                console.error('jsPDF 載入失敗');
+            };
+            document.head.appendChild(script);
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #f1f5f9;
+        }
+        .form-section {
+            display: none;
+        }
+        .form-section.active {
+            display: block;
+        }
+        .tab-btn {
+            transition: all 0.3s ease;
+            border-bottom: 4px solid transparent;
+        }
+        .tab-btn.active {
+            border-color: #3b82f6;
+            color: #1e3a8a;
+            background-color: #ffffff;
+        }
+        .form-container {
+            background-color: white;
+            padding: 2.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        input[type="text"], input[type="date"], textarea, select {
+            border-width: 1px;
+            border-color: #cbd5e1;
+            border-radius: 0.375rem;
+            padding: 0.5rem 0.75rem;
+            width: 100%;
+            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        input[type="text"]:focus, input[type="date"]:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgb(59 130 246 / 0.2);
+        }
+        label {
+            font-weight: 500;
+            color: #374151;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(1, minmax(0, 1fr));
+            gap: 1.5rem;
+        }
+        @media (min-width: 768px) {
+            .form-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+        .grid-col-span-full {
+            grid-column: 1 / -1;
+        }
+        .form-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e3a8a;
+            text-align: center;
+            margin-bottom: 2rem;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 1rem;
+        }
+        .section-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #1e40af;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #d1d5db;
+        }
+        .print-btn {
+            background-color: #1d4ed8;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .print-btn:hover {
+            background-color: #1e40af;
+        }
+        .save-btn {
+            background-color: #059669;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-right: 1rem;
+        }
+        .save-btn:hover {
+            background-color: #047857;
+        }
+        .saved-data-table {
+            margin-top: 2rem;
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            overflow: hidden;
+        }
+        .saved-data-table h3 {
+            background-color: #1e40af;
+            color: white;
+            padding: 1rem 1.5rem;
+            margin: 0;
+            font-size: 1.125rem;
+            font-weight: 600;
+        }
+        .table-container {
+            overflow-x: auto;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .data-table th,
+        .data-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .data-table th {
+            background-color: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+        }
+        .data-table tr:hover {
+            background-color: #f9fafb;
+        }
+        .delete-btn {
+            background-color: #dc2626;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            border: none;
+        }
+        .delete-btn:hover {
+            background-color: #b91c1c;
+        }
+        .view-btn {
+            background-color: #3b82f6;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            border: none;
+            margin-right: 0.5rem;
+        }
+        .view-btn:hover {
+            background-color: #2563eb;
+        }
+        .edit-btn {
+            background-color: #f59e0b;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            border: none;
+            margin-right: 0.5rem;
+        }
+        .edit-btn:hover {
+            background-color: #d97706;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1e3a8a;
+        }
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #6b7280;
+        }
+        .close-btn:hover {
+            color: #374151;
+        }
+        .modal-body {
+            line-height: 1.6;
+        }
+        .detail-row {
+            display: flex;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid #f3f4f6;
+            padding-bottom: 0.5rem;
+        }
+        .detail-label {
+            font-weight: 600;
+            color: #374151;
+            min-width: 150px;
+            flex-shrink: 0;
+        }
+        .detail-value {
+            color: #6b7280;
+            flex: 1;
+        }
+        @media print {
+            body {
+                background-color: white;
+                font-size: 12pt;
+            }
+            .no-print {
+                display: none;
+            }
+            .form-container {
+                box-shadow: none;
+                border: 2px solid #000;
+                padding: 1.5rem;
+            }
+            .form-section {
+                display: none !important;
+            }
+            .form-section.active {
+                display: block !important;
+            }
+            input, textarea, select {
+                border: 1px solid #ccc !important;
+            }
+            .form-title {
+                font-size: 18pt;
+            }
+            .section-title {
+                font-size: 14pt;
+                margin-top: 1.5rem;
+            }
+        }
+        .export-btn {
+            background-color: #7c3aed;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            border: none;
+            margin-right: 0.5rem;
+        }
+        .export-btn:hover {
+            background-color: #6d28d9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto p-4 md:p-8">
+        <!-- Header and Tabs -->
+        <div class="no-print mb-8">
+            <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">系統開發與維護作業</h1>
+            <p class="text-center text-gray-500 mb-8">請選擇您要填寫的表單</p>
+            <div class="bg-gray-200 rounded-lg p-1 flex justify-center space-x-1">
+                <button id="tab-btn-1" class="tab-btn flex-1 py-3 px-4 rounded-md font-medium text-gray-600 hover:bg-white" onclick="switchTab(1)">開發需求申請單</button>
+                <button id="tab-btn-2" class="tab-btn flex-1 py-3 px-4 rounded-md font-medium text-gray-600 hover:bg-white" onclick="switchTab(2)">系統開發測試紀錄單</button>
+                <button id="tab-btn-3" class="tab-btn flex-1 py-3 px-4 rounded-md font-medium text-gray-600 hover:bg-white" onclick="switchTab(3)">系統需求測試暨上線紀錄單</button>
+            </div>
+        </div>
+
+        <!-- Form 1: 開發需求申請單 -->
+        <div id="form-1" class="form-section">
+            <div class="form-container">
+                <h2 class="form-title">TWHB-ISMS-004-044 開發需求申請單</h2>
+                <div class="form-grid">
+                    <div>
+                        <label for="f1-dept">需求單位</label>
+                        <input type="text" id="f1-dept" name="f1-dept">
+                    </div>
+                    <div>
+                        <label for="f1-date">申請日期</label>
+                        <input type="date" id="f1-date" name="f1-date">
+                    </div>
+                    <div>
+                        <label for="f1-name">需求項目名稱</label>
+                        <input type="text" id="f1-name" name="f1-name">
+                    </div>
+                    <div>
+                        <label for="f1-jira">JIRA編號</label>
+                        <input type="text" id="f1-jira" name="f1-jira">
+                    </div>
+                    <div class="grid-col-span-full">
+                        <label for="f1-desc">需求說明</label>
+                        <textarea id="f1-desc" name="f1-desc" rows="5"></textarea>
+                    </div>
+                    <div class="grid-col-span-full">
+                        <label for="f1-benefit">預期效益</label>
+                        <textarea id="f1-benefit" name="f1-benefit" rows="5"></textarea>
+                    </div>
+                    <div>
+                        <label for="f1-staff">承辦人員</label>
+                        <input type="text" id="f1-staff" name="f1-staff">
+                    </div>
+                    <div>
+                        <label for="f1-manager">承辦單位主管</label>
+                        <input type="text" id="f1-manager" name="f1-manager">
+                    </div>
+                </div>
+                <div class="text-center mt-8 no-print">
+                    <button class="save-btn" onclick="saveForm(1)" type="button" style="background-color: #059669; color: white; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; margin-right: 1rem; border: none;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17,21 17,13 7,13 7,21"></polyline><polyline points="7,3 7,8 15,8"></polyline></svg>
+                        儲存表單
+                    </button>
+                    <button class="print-btn" onclick="printForm()" type="button">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                        列印此表單
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form 2: 系統開發測試紀錄單 -->
+        <div id="form-2" class="form-section">
+            <div class="form-container">
+                <h2 class="form-title">TWHB-ISMS-004-045 系統開發測試紀錄單</h2>
+                
+                <div class="section-title">系統說明</div>
+                <div class="form-grid">
+                    <div class="grid-col-span-full">
+                        <label for="f2-system-name">資通系統名稱</label>
+                        <input type="text" id="f2-system-name" name="f2-system-name">
+                    </div>
+                    <div>
+                        <label>測試說明</label>
+                        <div class="mt-2 space-y-2">
+                            <label class="flex items-center"><input type="radio" name="f2-test-desc" class="mr-2">新系統上線前測試</label>
+                            <label class="flex items-center"><input type="radio" name="f2-test-desc" class="mr-2">系統維護後測試</label>
+                        </div>
+                    </div>
+                    <div>
+                        <label>異動類型</label>
+                        <div class="mt-2 space-y-2">
+                            <label class="flex items-center"><input type="radio" name="f2-change-type" class="mr-2">一般變更</label>
+                            <label class="flex items-center"><input type="radio" name="f2-change-type" class="mr-2">重大變更</label>
+                            <div class="flex items-center">
+                                <input type="radio" name="f2-change-type" class="mr-2">
+                                <input type="text" placeholder="其他" class="flex-1">
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label>檢測類別</label>
+                        <div class="mt-2 space-y-2">
+                            <label class="flex items-center"><input type="checkbox" name="f2-check-type" class="mr-2">原始碼</label>
+                            <label class="flex items-center"><input type="checkbox" name="f2-check-type" class="mr-2">弱點掃描</label>
+                            <label class="flex items-center"><input type="checkbox" name="f2-check-type" class="mr-2">滲透測試</label>
+                            <div class="flex items-center">
+                                <input type="checkbox" name="f2-check-type" class="mr-2">
+                                <input type="text" placeholder="其他" class="flex-1">
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label>測試資料來源</label>
+                        <div class="mt-2 space-y-2">
+                            <label class="flex items-center"><input type="radio" name="f2-data-source" class="mr-2">無需以資料測試</label>
+                            <label class="flex items-center"><input type="radio" name="f2-data-source" class="mr-2">自行模擬資料</label>
+                            <label class="flex items-center"><input type="radio" name="f2-data-source" class="mr-2">「密」等級以上資料</label>
+                            <div class="flex items-center">
+                                <input type="radio" name="f2-data-source" class="mr-2">
+                                <input type="text" placeholder="其他" class="flex-1">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-title">測試紀錄 (開發單位)</div>
+                <div class="form-grid">
+                    <div>
+                        <label for="f2-req-jira">需求來源JIRA編號</label>
+                        <input type="text" id="f2-req-jira" name="f2-req-jira">
+                    </div>
+                    <div>
+                        <label for="f2-test-jira">測試資訊JIRA編號</label>
+                        <input type="text" id="f2-test-jira" name="f2-test-jira">
+                    </div>
+                    <div class="grid-col-span-full">
+                        <label for="f2-test-content">測試內容</label>
+                        <textarea id="f2-test-content" name="f2-test-content" rows="4"></textarea>
+                    </div>
+                    <div class="grid-col-span-full">
+                        <label>測試結果</label>
+                        <div class="mt-2 flex items-start space-x-4">
+                            <label class="flex items-center"><input type="radio" name="f2-test-result" class="mr-2">正常</label>
+                            <div class="flex-1">
+                                <label class="flex items-center mb-2"><input type="radio" name="f2-test-result" class="mr-2">異常</label>
+                                <textarea placeholder="異常說明" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid-col-span-full">
+                        <label for="f2-fix-desc">異常處置說明 (含JIRA編號)</label>
+                        <textarea id="f2-fix-desc" name="f2-fix-desc" rows="4"></textarea>
+                    </div>
+                    <div class="grid-col-span-full">
+                        <label for="f2-dev-staff">承辦人員</label>
+                        <input type="text" id="f2-dev-staff" name="f2-dev-staff">
+                    </div>
+                </div>
+                <div class="text-center mt-8 no-print">
+                    <button class="save-btn" onclick="saveForm(2)" type="button">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17,21 17,13 7,13 7,21"></polyline><polyline points="7,3 7,8 15,8"></polyline></svg>
+                        儲存表單
+                    </button>
+                    <button class="print-btn" onclick="printForm()" type="button">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                        列印此表單
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form 3: 系統需求測試暨上線紀錄單 -->
+        <div id="form-3" class="form-section">
+            <div class="form-container">
+                <h2 class="form-title">TWHB-ISMS-004-046 系統需求測試暨上線紀錄單</h2>
+                
+                <div class="section-title">測試紀錄 (需求單位)</div>
+                <div class="form-grid">
+                    <div>
+                        <label for="f3-req-jira">需求來源JIRA編號</label>
+                        <input type="text" id="f3-req-jira" name="f3-req-jira">
+                    </div>
+                    <div>
+                        <label for="f3-test-jira">測試資訊JIRA編號</label>
+                        <input type="text" id="f3-test-jira" name="f3-test-jira">
+                    </div>
+                    <div class="grid-col-span-full">
+                        <label for="f3-func-content">功能測試內容</label>
+                        <textarea id="f3-func-content" name="f3-func-content" rows="4"></textarea>
+                    </div>
+                    <div class="grid-col-span-full">
+                        <label>功能測試結果</label>
+                        <div class="mt-2 flex items-start space-x-4">
+                            <label class="flex items-center"><input type="radio" name="f3-func-result" class="mr-2">正常</label>
+                            <div class="flex-1">
+                                <label class="flex items-center mb-2"><input type="radio" name="f3-func-result" class="mr-2">異常</label>
+                                <textarea placeholder="異常說明" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-title">教育訓練</div>
+                <div class="form-grid">
+                    <div class="grid-col-span-full">
+                        <label>訓練項目/說明</label>
+                        <div class="mt-2 space-y-2">
+                           <label class="flex items-center"><input type="checkbox" name="f3-training-type" class="mr-2">電話/當面告知</label>
+                           <label class="flex items-center"><input type="checkbox" name="f3-training-type" class="mr-2">受訓____小時</label>
+                        </div>
+                    </div>
+                    <div><label for="f3-trainer">訓練人員</label><input type="text" id="f3-trainer"></div>
+                    <div><label for="f3-trainee">受訓人員</label><input type="text" id="f3-trainee"></div>
+                    <div><label for="f3-training-desc">訓練說明</label><input type="text" id="f3-training-desc"></div>
+                    <div><label for="f3-training-date">完成日期</label><input type="date" id="f3-training-date"></div>
+                </div>
+                <div class="form-grid mt-6">
+                    <div>
+                        <label for="f3-req-staff">承辦人員</label>
+                        <input type="text" id="f3-req-staff" name="f3-req-staff">
+                    </div>
+                    <div>
+                        <label for="f3-req-manager">承辦單位主管</label>
+                        <input type="text" id="f3-req-manager" name="f3-req-manager">
+                    </div>
+                </div>
+
+                <div class="section-title">上線作業</div>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <p>是否已完成相關測試</p>
+                        <div class="flex space-x-4">
+                            <label class="flex items-center"><input type="radio" name="f3-online-1" class="mr-2">是</label>
+                            <label class="flex items-center"><input type="radio" name="f3-online-1" class="mr-2">否</label>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <p>是否訂定程式上線時間、通知相關人員及使用者，並留存通知紀錄</p>
+                        <div class="flex space-x-4">
+                            <label class="flex items-center"><input type="radio" name="f3-online-2" class="mr-2">需要</label>
+                            <label class="flex items-center"><input type="radio" name="f3-online-2-sub" class="mr-2">是</label>
+                            <label class="flex items-center"><input type="radio" name="f3-online-2-sub" class="mr-2">否</label>
+                            <label class="flex items-center"><input type="radio" name="f3-online-2" class="mr-2">不需要</label>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <p>是否已備齊/更新使用者手冊、系統文件等使用表單</p>
+                        <div class="flex space-x-4">
+                            <label class="flex items-center"><input type="radio" name="f3-online-3" class="mr-2">需要</label>
+                            <label class="flex items-center"><input type="radio" name="f3-online-3-sub" class="mr-2">是</label>
+                            <label class="flex items-center"><input type="radio" name="f3-online-3-sub" class="mr-2">否</label>
+                            <label class="flex items-center"><input type="radio" name="f3-online-3" class="mr-2">不需要</label>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <p>是否已設定完成使用者存取權限</p>
+                        <div class="flex space-x-4">
+                            <label class="flex items-center"><input type="radio" name="f3-online-4" class="mr-2">需要</label>
+                            <label class="flex items-center"><input type="radio" name="f3-online-4-sub" class="mr-2">是</label>
+                            <label class="flex items-center"><input type="radio" name="f3-online-4-sub" class="mr-2">否</label>
+                            <label class="flex items-center"><input type="radio" name="f3-online-4" class="mr-2">不需要</label>
+                        </div>
+                    </div>
+                </div>
+                 <div class="form-grid mt-6">
+                    <div>
+                        <label for="f3-info-staff">資訊組承辦人員</label>
+                        <input type="text" id="f3-info-staff" name="f3-info-staff">
+                    </div>
+                    <div>
+                        <label for="f3-info-manager">資訊組單位主管</label>
+                        <input type="text" id="f3-info-manager" name="f3-info-manager">
+                    </div>
+                </div>
+
+                <div class="text-center mt-8 no-print">
+                    <button class="save-btn" onclick="saveForm(3)" type="button">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17,21 17,13 7,13 7,21"></polyline><polyline points="7,3 7,8 15,8"></polyline></svg>
+                        儲存表單
+                    </button>
+                    <button class="print-btn" onclick="printForm()" type="button">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                        列印此表單
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 儲存的資料表格 -->
+    <div class="container mx-auto p-4 md:p-8">
+        <div class="saved-data-table">
+            <h3>已儲存的表單資料</h3>
+            
+            <!-- 搜尋篩選區域 -->
+            <div class="search-container" style="padding: 1rem 1.5rem; border-bottom: 1px solid #e5e7eb; background-color: #f9fafb;">
+                <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <label for="searchInput" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #374151;">搜尋關鍵字：</label>
+                        <input type="text" id="searchInput" placeholder="輸入表單類型、項目名稱、承辦人員或JIRA編號..." 
+                               style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; font-size: 0.875rem;">
+                    </div>
+                    <div style="min-width: 150px;">
+                        <label for="typeFilter" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #374151;">表單類型：</label>
+                        <select id="typeFilter" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #cbd5e1; border-radius: 0.375rem; font-size: 0.875rem;">
+                            <option value="">全部類型</option>
+                            <option value="開發需求申請單">開發需求申請單</option>
+                            <option value="系統開發測試紀錄單">系統開發測試紀錄單</option>
+                            <option value="系統需求測試暨上線紀錄單">系統需求測試暨上線紀錄單</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; align-items: end; gap: 0.5rem;">
+                        <button id="clearSearchBtn" onclick="clearSearch()" 
+                                style="padding: 0.5rem 1rem; background-color: #6b7280; color: white; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem;">
+                            清除篩選
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>表單類型</th>
+                            <th>申請日期</th>
+                            <th>紀錄編號</th>
+                            <th>需求項目/系統名稱</th>
+                            <th>承辦人員</th>
+                            <th>JIRA編號</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="saved-data-tbody">
+                        <!-- 儲存的資料會在這裡顯示 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+     <!-- 查看詳情的模態視窗 -->
+     <div id="viewModal" class="modal">
+         <div class="modal-content">
+             <div class="modal-header">
+                 <h3 class="modal-title" id="modalTitle">表單詳情</h3>
+                 <button class="close-btn" onclick="closeModal()">&times;</button>
+             </div>
+             <div class="modal-body" id="modalBody">
+                 <!-- 詳細內容會在這裡顯示 -->
+             </div>
+         </div>
+     </div>
+
+     <!-- 編輯表單的模態視窗 -->
+     <div id="editModal" class="modal">
+         <div class="modal-content">
+             <div class="modal-header">
+                 <h3 class="modal-title" id="editModalTitle">編輯表單</h3>
+                 <button class="close-btn" onclick="closeEditModal()">&times;</button>
+             </div>
+             <div class="modal-body" id="editModalBody">
+                 <!-- 編輯表單內容會在這裡顯示 -->
+             </div>
+         </div>
+     </div>
+
+    <script>
+        // 頁籤切換邏輯
+        function switchTab(tabIndex) {
+            // 隱藏所有表單
+            document.querySelectorAll('.form-section').forEach(form => {
+                form.classList.remove('active');
+            });
+            // 移除所有按鈕的 active 狀態
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // 顯示選擇的表單
+            document.getElementById(`form-${tabIndex}`).classList.add('active');
+            // 將選擇的按鈕設為 active
+            document.getElementById(`tab-btn-${tabIndex}`).classList.add('active');
+        }
+
+        // 儲存資料陣列
+        let savedData = JSON.parse(localStorage.getItem('formData') || '[]');
+
+        // 儲存表單功能
+        function saveForm(formType) {
+            let formData = {};
+            let formTitle = '';
+            
+            switch(formType) {
+                case 1:
+                    formTitle = '開發需求申請單';
+                    formData = {
+                        type: formTitle,
+                        dept: document.getElementById('f1-dept').value,
+                        date: document.getElementById('f1-date').value,
+                        name: document.getElementById('f1-name').value,
+                        jira: document.getElementById('f1-jira').value,
+                        desc: document.getElementById('f1-desc').value,
+                        benefit: document.getElementById('f1-benefit').value,
+                        staff: document.getElementById('f1-staff').value,
+                        manager: document.getElementById('f1-manager').value
+                    };
+                    break;
+                case 2:
+                    formTitle = '系統開發測試紀錄單';
+                    formData = {
+                        type: formTitle,
+                        systemName: document.getElementById('f2-system-name').value,
+                        date: new Date().toISOString().split('T')[0],
+                        reqJira: document.getElementById('f2-req-jira').value,
+                        testJira: document.getElementById('f2-test-jira').value,
+                        testContent: document.getElementById('f2-test-content').value,
+                        fixDesc: document.getElementById('f2-fix-desc').value,
+                        staff: document.getElementById('f2-dev-staff').value
+                    };
+                    break;
+                case 3:
+                    formTitle = '系統需求測試暨上線紀錄單';
+                    formData = {
+                        type: formTitle,
+                        reqJira: document.getElementById('f3-req-jira').value,
+                        testJira: document.getElementById('f3-test-jira').value,
+                        funcContent: document.getElementById('f3-func-content').value,
+                        reqStaff: document.getElementById('f3-req-staff').value,
+                        reqManager: document.getElementById('f3-req-manager').value,
+                        infoStaff: document.getElementById('f3-info-staff').value,
+                        infoManager: document.getElementById('f3-info-manager').value,
+                        date: new Date().toISOString().split('T')[0]
+                    };
+                    break;
+            }
+            
+            // 檢查必填欄位
+            if (formType === 1 && (!formData.name || !formData.staff)) {
+                alert('請填寫需求項目名稱和承辦人員');
+                return;
+            }
+            if (formType === 2 && (!formData.systemName || !formData.staff)) {
+                alert('請填寫資通系統名稱和承辦人員');
+                return;
+            }
+            if (formType === 3 && (!formData.reqStaff || !formData.infoStaff)) {
+                alert('請填寫承辦人員和資訊組承辦人員');
+                return;
+            }
+            
+            // 添加時間戳和ID
+            formData.id = Date.now();
+            formData.saveTime = new Date().toLocaleString('zh-TW');
+            
+            // 生成並儲存紀錄編號
+            formData.recordNumber = generateRecordNumber(formData.type, formData.date);
+            
+            // 儲存到本地儲存
+            savedData.push(formData);
+            localStorage.setItem('formData', JSON.stringify(savedData));
+            
+            // 更新表格顯示
+            updateSavedDataTable();
+            
+            alert('表單已成功儲存！');
+        }
+
+        // 更新儲存資料表格
+        function updateSavedDataTable() {
+            const tbody = document.getElementById('saved-data-tbody');
+            tbody.innerHTML = '';
+            
+            // 獲取搜尋和篩選條件
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const typeFilter = document.getElementById('typeFilter').value;
+            
+            // 篩選資料
+            const filteredData = savedData.filter(data => {
+                // 表單類型篩選
+                if (typeFilter && data.type !== typeFilter) {
+                    return false;
+                }
+                
+                // 關鍵字搜尋
+                if (searchTerm) {
+                    const searchableText = [
+                        data.type,
+                        data.name || '',
+                        data.systemName || '',
+                        data.staff || '',
+                        data.reqStaff || '',
+                        data.jira || '',
+                        data.reqJira || '',
+                        data.testJira || '',
+                        data.dept || '',
+                        data.desc || '',
+                        data.benefit || '',
+                        data.testContent || '',
+                        data.fixDesc || '',
+                        data.funcContent || '',
+                        data.reqManager || '',
+                        data.infoStaff || '',
+                        data.infoManager || ''
+                    ].join(' ').toLowerCase();
+                    
+                    if (!searchableText.includes(searchTerm)) {
+                        return false;
+                    }
+                }
+                
+                return true;
+            });
+            
+            // 顯示篩選後的資料
+            filteredData.forEach((data, index) => {
+                const row = document.createElement('tr');
+                
+                let displayName = '';
+                let displayStaff = '';
+                let displayJira = '';
+                
+                switch(data.type) {
+                    case '開發需求申請單':
+                        displayName = data.name || '';
+                        displayStaff = data.staff || '';
+                        displayJira = data.jira || '';
+                        break;
+                    case '系統開發測試紀錄單':
+                        displayName = data.systemName || '';
+                        displayStaff = data.staff || '';
+                        displayJira = data.reqJira || '';
+                        break;
+                    case '系統需求測試暨上線紀錄單':
+                        displayName = '系統需求測試';
+                        displayStaff = data.reqStaff || '';
+                        displayJira = data.reqJira || '';
+                        break;
+                }
+                
+                row.innerHTML = `
+                    <td>${data.type}</td>
+                    <td>${data.date || data.saveTime.split(' ')[0]}</td>
+                    <td>${data.recordNumber || '未生成'}</td>
+                    <td>${displayName}</td>
+                    <td>${displayStaff}</td>
+                    <td>${displayJira}</td>
+                    <td>
+                        <button class="view-btn" onclick="viewSavedData(${savedData.indexOf(data)})">查看</button>
+                        <button class="edit-btn" onclick="editSavedData(${savedData.indexOf(data)})">編輯</button>
+                        <button class="delete-btn" onclick="deleteSavedData(${savedData.indexOf(data)})">刪除</button>
+                        <button class="export-btn" onclick="exportToPDF(${savedData.indexOf(data)})">匯出PDF</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            // 顯示搜尋結果數量
+            updateSearchResultCount(filteredData.length);
+        }
+        
+        // 更新搜尋結果數量
+        function updateSearchResultCount(count) {
+            const searchContainer = document.querySelector('.search-container');
+            let resultCount = searchContainer.querySelector('.result-count');
+            
+            if (!resultCount) {
+                resultCount = document.createElement('div');
+                resultCount.className = 'result-count';
+                resultCount.style.cssText = 'margin-top: 0.5rem; font-size: 0.875rem; color: #6b7280;';
+                searchContainer.appendChild(resultCount);
+            }
+            
+            const totalCount = savedData.length;
+            if (count === totalCount) {
+                resultCount.textContent = `共 ${totalCount} 筆資料`;
+            } else {
+                resultCount.textContent = `搜尋結果：${count} 筆 (共 ${totalCount} 筆)`;
+            }
+        }
+        
+        // 清除搜尋條件
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('typeFilter').value = '';
+            updateSavedDataTable();
+        }
+
+                 // 查看儲存資料詳情
+         function viewSavedData(index) {
+             const data = savedData[index];
+             const modal = document.getElementById('viewModal');
+             const modalTitle = document.getElementById('modalTitle');
+             const modalBody = document.getElementById('modalBody');
+             
+             modalTitle.textContent = data.type;
+             
+             let detailsHTML = '';
+             
+             switch(data.type) {
+                 case '開發需求申請單':
+                     detailsHTML = `
+                         <div class="detail-row">
+                             <div class="detail-label">紀錄編號：</div>
+                             <div class="detail-value">${data.recordNumber || '未生成'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">需求單位：</div>
+                             <div class="detail-value">${data.dept || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">申請日期：</div>
+                             <div class="detail-value">${data.date || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">需求項目名稱：</div>
+                             <div class="detail-value">${data.name || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">JIRA編號：</div>
+                             <div class="detail-value">${data.jira || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">需求說明：</div>
+                             <div class="detail-value">${data.desc || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">預期效益：</div>
+                             <div class="detail-value">${data.benefit || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">承辦人員：</div>
+                             <div class="detail-value">${data.staff || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">承辦單位主管：</div>
+                             <div class="detail-value">${data.manager || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">儲存時間：</div>
+                             <div class="detail-value">${data.saveTime}</div>
+                         </div>
+                     `;
+                     break;
+                     
+                 case '系統開發測試紀錄單':
+                     detailsHTML = `
+                         <div class="detail-row">
+                             <div class="detail-label">紀錄編號：</div>
+                             <div class="detail-value">${data.recordNumber || '未生成'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">資通系統名稱：</div>
+                             <div class="detail-value">${data.systemName || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">申請日期：</div>
+                             <div class="detail-value">${data.date || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">需求來源JIRA編號：</div>
+                             <div class="detail-value">${data.reqJira || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">測試資訊JIRA編號：</div>
+                             <div class="detail-value">${data.testJira || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">測試內容：</div>
+                             <div class="detail-value">${data.testContent || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">異常處置說明：</div>
+                             <div class="detail-value">${data.fixDesc || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">承辦人員：</div>
+                             <div class="detail-value">${data.staff || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">儲存時間：</div>
+                             <div class="detail-value">${data.saveTime}</div>
+                         </div>
+                     `;
+                     break;
+                     
+                 case '系統需求測試暨上線紀錄單':
+                     detailsHTML = `
+                         <div class="detail-row">
+                             <div class="detail-label">紀錄編號：</div>
+                             <div class="detail-value">${data.recordNumber || '未生成'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">需求來源JIRA編號：</div>
+                             <div class="detail-value">${data.reqJira || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">測試資訊JIRA編號：</div>
+                             <div class="detail-value">${data.testJira || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">功能測試內容：</div>
+                             <div class="detail-value">${data.funcContent || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">承辦人員：</div>
+                             <div class="detail-value">${data.reqStaff || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">承辦單位主管：</div>
+                             <div class="detail-value">${data.reqManager || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">資訊組承辦人員：</div>
+                             <div class="detail-value">${data.infoStaff || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">資訊組單位主管：</div>
+                             <div class="detail-value">${data.infoManager || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">申請日期：</div>
+                             <div class="detail-value">${data.date || '未填寫'}</div>
+                         </div>
+                         <div class="detail-row">
+                             <div class="detail-label">儲存時間：</div>
+                             <div class="detail-value">${data.saveTime}</div>
+                         </div>
+                     `;
+                     break;
+             }
+             
+             modalBody.innerHTML = detailsHTML;
+             modal.style.display = 'block';
+         }
+
+         // 關閉模態視窗
+         function closeModal() {
+             document.getElementById('viewModal').style.display = 'none';
+         }
+
+         // 關閉編輯模態視窗
+         function closeEditModal() {
+             document.getElementById('editModal').style.display = 'none';
+         }
+
+         // 點擊模態視窗外部關閉
+         window.onclick = function(event) {
+             const modal = document.getElementById('viewModal');
+             const editModal = document.getElementById('editModal');
+             if (event.target === modal) {
+                 modal.style.display = 'none';
+             }
+             if (event.target === editModal) {
+                 editModal.style.display = 'none';
+             }
+         }
+
+         // 刪除儲存資料
+         function deleteSavedData(index) {
+             if (confirm('確定要刪除這筆資料嗎？')) {
+                 savedData.splice(index, 1);
+                 localStorage.setItem('formData', JSON.stringify(savedData));
+                 updateSavedDataTable();
+             }
+         }
+
+         // 編輯儲存資料
+         function editSavedData(index) {
+             const data = savedData[index];
+             const modal = document.getElementById('editModal');
+             const modalTitle = document.getElementById('editModalTitle');
+             const modalBody = document.getElementById('editModalBody');
+             
+             modalTitle.textContent = `編輯 ${data.type}`;
+             
+             let editHTML = '';
+             
+             switch(data.type) {
+                 case '開發需求申請單':
+                     editHTML = `
+                         <form id="editForm" onsubmit="saveEditedData(${index}, event)">
+                             <div class="form-grid">
+                                 <div>
+                                     <label for="edit-dept">需求單位：</label>
+                                     <input type="text" id="edit-dept" value="${data.dept || ''}" required>
+                                 </div>
+                                 <div>
+                                     <label for="edit-date">申請日期：</label>
+                                     <input type="date" id="edit-date" value="${data.date || ''}" required>
+                                 </div>
+                                 <div class="grid-col-span-full">
+                                     <label for="edit-name">需求項目名稱：</label>
+                                     <input type="text" id="edit-name" value="${data.name || ''}" required>
+                                 </div>
+                                 <div>
+                                     <label for="edit-jira">JIRA編號：</label>
+                                     <input type="text" id="edit-jira" value="${data.jira || ''}">
+                                 </div>
+                                 <div>
+                                     <label for="edit-staff">承辦人員：</label>
+                                     <input type="text" id="edit-staff" value="${data.staff || ''}" required>
+                                 </div>
+                                 <div class="grid-col-span-full">
+                                     <label for="edit-desc">需求說明：</label>
+                                     <textarea id="edit-desc" rows="4">${data.desc || ''}</textarea>
+                                 </div>
+                                 <div class="grid-col-span-full">
+                                     <label for="edit-benefit">預期效益：</label>
+                                     <textarea id="edit-benefit" rows="4">${data.benefit || ''}</textarea>
+                                 </div>
+                                 <div>
+                                     <label for="edit-manager">承辦單位主管：</label>
+                                     <input type="text" id="edit-manager" value="${data.manager || ''}">
+                                 </div>
+                             </div>
+                             <div class="text-center mt-6">
+                                 <button type="submit" class="save-btn">儲存修改</button>
+                                 <button type="button" class="print-btn" onclick="closeEditModal()">取消</button>
+                             </div>
+                         </form>
+                     `;
+                     break;
+                     
+                 case '系統開發測試紀錄單':
+                     editHTML = `
+                         <form id="editForm" onsubmit="saveEditedData(${index}, event)">
+                             <div class="form-grid">
+                                 <div class="grid-col-span-full">
+                                     <label for="edit-system-name">資通系統名稱：</label>
+                                     <input type="text" id="edit-system-name" value="${data.systemName || ''}" required>
+                                 </div>
+                                 <div>
+                                     <label for="edit-req-jira">需求JIRA編號：</label>
+                                     <input type="text" id="edit-req-jira" value="${data.reqJira || ''}">
+                                 </div>
+                                 <div>
+                                     <label for="edit-test-jira">測試JIRA編號：</label>
+                                     <input type="text" id="edit-test-jira" value="${data.testJira || ''}">
+                                 </div>
+                                 <div>
+                                     <label for="edit-dev-staff">承辦人員：</label>
+                                     <input type="text" id="edit-dev-staff" value="${data.staff || ''}" required>
+                                 </div>
+                                 <div class="grid-col-span-full">
+                                     <label for="edit-test-content">測試內容：</label>
+                                     <textarea id="edit-test-content" rows="4">${data.testContent || ''}</textarea>
+                                 </div>
+                                 <div class="grid-col-span-full">
+                                     <label for="edit-fix-desc">異常處置說明：</label>
+                                     <textarea id="edit-fix-desc" rows="4">${data.fixDesc || ''}</textarea>
+                                 </div>
+                             </div>
+                             <div class="text-center mt-6">
+                                 <button type="submit" class="save-btn">儲存修改</button>
+                                 <button type="button" class="print-btn" onclick="closeEditModal()">取消</button>
+                             </div>
+                         </form>
+                     `;
+                     break;
+                     
+                 case '系統需求測試暨上線紀錄單':
+                     editHTML = `
+                         <form id="editForm" onsubmit="saveEditedData(${index}, event)">
+                             <div class="form-grid">
+                                 <div>
+                                     <label for="edit-req-jira">需求來源JIRA編號：</label>
+                                     <input type="text" id="edit-req-jira" value="${data.reqJira || ''}">
+                                 </div>
+                                 <div>
+                                     <label for="edit-test-jira">測試資訊JIRA編號：</label>
+                                     <input type="text" id="edit-test-jira" value="${data.testJira || ''}">
+                                 </div>
+                                 <div class="grid-col-span-full">
+                                     <label for="edit-func-content">功能測試內容：</label>
+                                     <textarea id="edit-func-content" rows="4">${data.funcContent || ''}</textarea>
+                                 </div>
+                                 <div>
+                                     <label for="edit-req-staff">承辦人員：</label>
+                                     <input type="text" id="edit-req-staff" value="${data.reqStaff || ''}" required>
+                                 </div>
+                                 <div>
+                                     <label for="edit-req-manager">承辦單位主管：</label>
+                                     <input type="text" id="edit-req-manager" value="${data.reqManager || ''}">
+                                 </div>
+                                 <div>
+                                     <label for="edit-info-staff">資訊組承辦人員：</label>
+                                     <input type="text" id="edit-info-staff" value="${data.infoStaff || ''}" required>
+                                 </div>
+                                 <div>
+                                     <label for="edit-info-manager">資訊組單位主管：</label>
+                                     <input type="text" id="edit-info-manager" value="${data.infoManager || ''}">
+                                 </div>
+                             </div>
+                             <div class="text-center mt-6">
+                                 <button type="submit" class="save-btn">儲存修改</button>
+                                 <button type="button" class="print-btn" onclick="closeEditModal()">取消</button>
+                             </div>
+                         </form>
+                     `;
+                     break;
+             }
+             
+             modalBody.innerHTML = editHTML;
+             modal.style.display = 'block';
+         }
+
+         // 儲存編輯後的資料
+         function saveEditedData(index, event) {
+             event.preventDefault();
+             
+             const data = savedData[index];
+             const updatedData = { ...data };
+             
+             switch(data.type) {
+                 case '開發需求申請單':
+                     updatedData.dept = document.getElementById('edit-dept').value;
+                     updatedData.date = document.getElementById('edit-date').value;
+                     updatedData.name = document.getElementById('edit-name').value;
+                     updatedData.jira = document.getElementById('edit-jira').value;
+                     updatedData.desc = document.getElementById('edit-desc').value;
+                     updatedData.benefit = document.getElementById('edit-benefit').value;
+                     updatedData.staff = document.getElementById('edit-staff').value;
+                     updatedData.manager = document.getElementById('edit-manager').value;
+                     break;
+                     
+                 case '系統開發測試紀錄單':
+                     updatedData.systemName = document.getElementById('edit-system-name').value;
+                     updatedData.reqJira = document.getElementById('edit-req-jira').value;
+                     updatedData.testJira = document.getElementById('edit-test-jira').value;
+                     updatedData.testContent = document.getElementById('edit-test-content').value;
+                     updatedData.fixDesc = document.getElementById('edit-fix-desc').value;
+                     updatedData.staff = document.getElementById('edit-dev-staff').value;
+                     break;
+                     
+                 case '系統需求測試暨上線紀錄單':
+                     updatedData.reqJira = document.getElementById('edit-req-jira').value;
+                     updatedData.testJira = document.getElementById('edit-test-jira').value;
+                     updatedData.funcContent = document.getElementById('edit-func-content').value;
+                     updatedData.reqStaff = document.getElementById('edit-req-staff').value;
+                     updatedData.reqManager = document.getElementById('edit-req-manager').value;
+                     updatedData.infoStaff = document.getElementById('edit-info-staff').value;
+                     updatedData.infoManager = document.getElementById('edit-info-manager').value;
+                     break;
+             }
+             
+             // 更新儲存時間
+             updatedData.saveTime = new Date().toLocaleString('zh-TW');
+             
+             // 更新資料
+             savedData[index] = updatedData;
+             localStorage.setItem('formData', JSON.stringify(savedData));
+             
+             // 關閉編輯模態視窗
+             closeEditModal();
+             
+             // 更新表格
+             updateSavedDataTable();
+             
+             alert('表單已成功更新！');
+         }
+
+        // 列印功能
+        function printForm() {
+            try {
+                console.log('列印功能被觸發');
+                window.print();
+            } catch (error) {
+                console.error('列印時發生錯誤:', error);
+                alert('列印功能發生錯誤，請檢查瀏覽器設定或嘗試手動列印 (Ctrl+P)');
+            }
+        }
+
+        // 生成紀錄編號
+        function generateRecordNumber(formType, date) {
+            const today = new Date();
+            const year = today.getFullYear().toString().slice(-2); // 取後兩位數
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            const dateStr = `${year}${month}${day}`;
+            
+            // 根據表單類型決定編號
+            let docNumber;
+            switch(formType) {
+                case '開發需求申請單':
+                    docNumber = '044';
+                    break;
+                case '系統開發測試紀錄單':
+                    docNumber = '045';
+                    break;
+                case '系統需求測試暨上線紀錄單':
+                    docNumber = '046';
+                    break;
+                default:
+                    docNumber = '000';
+            }
+            
+            // 計算當天相同表單類型的記錄數量
+            const todayRecords = savedData.filter(data => {
+                if (data.type !== formType) return false;
+                
+                // 檢查是否有現有的紀錄編號
+                if (data.recordNumber) {
+                    const recordDate = data.recordNumber.split('-')[3]; // 取得日期部分
+                    return recordDate === dateStr;
+                }
+                
+                // 如果沒有紀錄編號，檢查儲存時間是否為今天
+                const saveDate = new Date(data.saveTime);
+                const saveYear = saveDate.getFullYear().toString().slice(-2);
+                const saveMonth = String(saveDate.getMonth() + 1).padStart(2, '0');
+                const saveDay = String(saveDate.getDate()).padStart(2, '0');
+                const saveDateStr = `${saveYear}${saveMonth}${saveDay}`;
+                
+                return saveDateStr === dateStr;
+            });
+            
+            // 流水號從 01 開始，依序遞增
+            const sequence = String(todayRecords.length + 1).padStart(2, '0');
+            
+            // 決定 G 或 R
+            const type = (formType === '開發需求申請單') ? 'G' : 'R';
+            
+            return `IS-${type}-${docNumber}-${dateStr}-${sequence}`;
+        }
+
+        // 匯出PDF功能
+        function exportToPDF(index) {
+            const data = savedData[index];
+            // 使用已儲存的紀錄編號，如果沒有則重新生成
+            const recordNumber = data.recordNumber || generateRecordNumber(data.type, data.date);
+            
+            try {
+                // 檢查 jsPDF 是否可用
+                if (typeof window.jsPDF === 'undefined' && typeof jsPDF === 'undefined') {
+                    throw new Error('jsPDF 函式庫未正確載入');
+                }
+                
+                // 創建 PDF 內容
+                const jsPDFConstructor = window.jsPDF || jsPDF;
+                const pdf = new jsPDFConstructor('p', 'mm', 'a4');
+                const pageWidth = pdf.internal.pageSize.getWidth();
+                const margin = 20;
+                const contentWidth = pageWidth - (margin * 2);
+                let yPosition = 30;
+                
+                // 設定字體和樣式
+                pdf.setFont('helvetica');
+                pdf.setFontSize(16);
+                
+                // 標題
+                pdf.setFontSize(20);
+                pdf.setFont('helvetica', 'bold');
+                pdf.text(data.type, pageWidth / 2, yPosition, { align: 'center' });
+                yPosition += 20;
+                
+                // 紀錄編號
+                pdf.setFontSize(14);
+                pdf.setFont('helvetica', 'bold');
+                pdf.text(`紀錄編號：${recordNumber}`, margin, yPosition);
+                yPosition += 15;
+                
+                // 分隔線
+                pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+                yPosition += 20;
+                
+                // 根據表單類型添加內容
+                pdf.setFontSize(12);
+                let content = [];
+                
+                switch(data.type) {
+                    case '開發需求申請單':
+                        content = [
+                            { label: '需求單位', value: data.dept || '未填寫' },
+                            { label: '申請日期', value: data.date || '未填寫' },
+                            { label: '需求項目名稱', value: data.name || '未填寫' },
+                            { label: 'JIRA編號', value: data.jira || '未填寫' },
+                            { label: '需求說明', value: data.desc || '未填寫' },
+                            { label: '預期效益', value: data.benefit || '未填寫' },
+                            { label: '承辦人員', value: data.staff || '未填寫' },
+                            { label: '承辦單位主管', value: data.manager || '未填寫' }
+                        ];
+                        break;
+                        
+                    case '系統開發測試紀錄單':
+                        content = [
+                            { label: '資通系統名稱', value: data.systemName || '未填寫' },
+                            { label: '申請日期', value: data.date || '未填寫' },
+                            { label: '需求來源JIRA編號', value: data.reqJira || '未填寫' },
+                            { label: '測試資訊JIRA編號', value: data.testJira || '未填寫' },
+                            { label: '測試內容', value: data.testContent || '未填寫' },
+                            { label: '異常處置說明', value: data.fixDesc || '未填寫' },
+                            { label: '承辦人員', value: data.staff || '未填寫' }
+                        ];
+                        break;
+                        
+                    case '系統需求測試暨上線紀錄單':
+                        content = [
+                            { label: '需求來源JIRA編號', value: data.reqJira || '未填寫' },
+                            { label: '測試資訊JIRA編號', value: data.testJira || '未填寫' },
+                            { label: '功能測試內容', value: data.funcContent || '未填寫' },
+                            { label: '承辦人員', value: data.reqStaff || '未填寫' },
+                            { label: '承辦單位主管', value: data.reqManager || '未填寫' },
+                            { label: '資訊組承辦人員', value: data.infoStaff || '未填寫' },
+                            { label: '資訊組單位主管', value: data.infoManager || '未填寫' },
+                            { label: '申請日期', value: data.date || '未填寫' }
+                        ];
+                        break;
+                }
+                
+                // 添加內容到 PDF
+                content.forEach(item => {
+                    // 檢查是否需要新頁面
+                    if (yPosition > 250) {
+                        pdf.addPage();
+                        yPosition = 30;
+                    }
+                    
+                    // 標籤
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text(item.label + '：', margin, yPosition);
+                    
+                    // 值
+                    pdf.setFont('helvetica', 'normal');
+                    const valueLines = pdf.splitTextToSize(item.value, contentWidth - 50);
+                    pdf.text(valueLines, margin + 50, yPosition);
+                    
+                    yPosition += Math.max(15, valueLines.length * 6);
+                });
+                
+                // 添加儲存時間
+                yPosition += 15;
+                pdf.line(margin, yPosition, pageWidth - margin, yPosition);
+                yPosition += 15;
+                pdf.setFont('helvetica', 'italic');
+                pdf.setFontSize(10);
+                pdf.text(`儲存時間：${data.saveTime}`, margin, yPosition);
+                
+                // 添加圖片功能說明
+                yPosition += 20;
+                pdf.setFont('helvetica', 'normal');
+                pdf.setFontSize(10);
+                pdf.text('注意：如需附加圖片，請將圖片檔案與此 PDF 一併保存。', margin, yPosition);
+                
+                // 儲存檔案
+                const fileName = `${data.type}_${recordNumber}.pdf`;
+                pdf.save(fileName);
+                
+                alert(`表單已成功匯出為 PDF！\n檔案名稱：${fileName}\n紀錄編號：${recordNumber}`);
+                
+            } catch (error) {
+                console.error('PDF 匯出錯誤:', error);
+                console.log('jsPDF 可用性檢查:', {
+                    'window.jsPDF': typeof window.jsPDF,
+                    'jsPDF': typeof jsPDF,
+                    'window': typeof window
+                });
+                alert(`PDF 匯出失敗：${error.message}\n請檢查網路連線或稍後再試。`);
+                
+                // 提供備用方案：生成文字報告
+                if (confirm('PDF 匯出失敗，是否要生成文字報告作為備用方案？')) {
+                    generateTextReport(data, recordNumber);
+                }
+            }
+        }
+
+        // 備用方案：生成文字報告
+        function generateTextReport(data, recordNumber) {
+            // 使用已儲存的紀錄編號，如果沒有則使用傳入的編號
+            const finalRecordNumber = data.recordNumber || recordNumber;
+            let report = `${data.type}\n`;
+            report += `紀錄編號：${finalRecordNumber}\n`;
+            report += `儲存時間：${data.saveTime}\n`;
+            report += '='.repeat(50) + '\n\n';
+            
+            let content = [];
+            switch(data.type) {
+                case '開發需求申請單':
+                    content = [
+                        { label: '需求單位', value: data.dept || '未填寫' },
+                        { label: '申請日期', value: data.date || '未填寫' },
+                        { label: '需求項目名稱', value: data.name || '未填寫' },
+                        { label: 'JIRA編號', value: data.jira || '未填寫' },
+                        { label: '需求說明', value: data.desc || '未填寫' },
+                        { label: '預期效益', value: data.benefit || '未填寫' },
+                        { label: '承辦人員', value: data.staff || '未填寫' },
+                        { label: '承辦單位主管', value: data.manager || '未填寫' }
+                    ];
+                    break;
+                case '系統開發測試紀錄單':
+                    content = [
+                        { label: '資通系統名稱', value: data.systemName || '未填寫' },
+                        { label: '申請日期', value: data.date || '未填寫' },
+                        { label: '需求來源JIRA編號', value: data.reqJira || '未填寫' },
+                        { label: '測試資訊JIRA編號', value: data.testJira || '未填寫' },
+                        { label: '測試內容', value: data.testContent || '未填寫' },
+                        { label: '異常處置說明', value: data.fixDesc || '未填寫' },
+                        { label: '承辦人員', value: data.staff || '未填寫' }
+                    ];
+                    break;
+                case '系統需求測試暨上線紀錄單':
+                    content = [
+                        { label: '需求來源JIRA編號', value: data.reqJira || '未填寫' },
+                        { label: '測試資訊JIRA編號', value: data.testJira || '未填寫' },
+                        { label: '功能測試內容', value: data.funcContent || '未填寫' },
+                        { label: '承辦人員', value: data.reqStaff || '未填寫' },
+                        { label: '承辦單位主管', value: data.reqManager || '未填寫' },
+                        { label: '資訊組承辦人員', value: data.infoStaff || '未填寫' },
+                        { label: '資訊組單位主管', value: data.infoManager || '未填寫' },
+                        { label: '申請日期', value: data.date || '未填寫' }
+                    ];
+                    break;
+            }
+            
+            content.forEach(item => {
+                report += `${item.label}：${item.value}\n`;
+            });
+            
+            report += '\n注意：如需附加圖片，請將圖片檔案與此報告一併保存。';
+            
+            // 創建下載連結
+            const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${data.type}_${finalRecordNumber}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            alert(`文字報告已生成！\n檔案名稱：${data.type}_${finalRecordNumber}.txt\n紀錄編號：${finalRecordNumber}`);
+        }
+
+        // 檢查 jsPDF 載入狀態
+        function checkJsPDFStatus() {
+            console.log('jsPDF 載入狀態檢查:', {
+                'window.jsPDF': typeof window.jsPDF,
+                'jsPDF': typeof jsPDF,
+                'window.jsPDF !== undefined': window.jsPDF !== undefined,
+                'jsPDF !== undefined': typeof jsPDF !== 'undefined'
+            });
+        }
+
+        // 頁面載入時的初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 檢查 jsPDF 載入狀態
+            setTimeout(checkJsPDFStatus, 1000);
+            // 自動設定申請日期為今天
+            const today = new Date().toISOString().split('T')[0];
+            const dateInputs = document.querySelectorAll('input[type="date"]');
+            dateInputs.forEach(input => {
+                if (!input.value) {
+                    input.value = today;
+                }
+            });
+            
+            // 預設顯示第一個表單
+            switchTab(1);
+            
+            // 為所有列印按鈕添加事件監聽器作為備用
+            const printButtons = document.querySelectorAll('.print-btn');
+            printButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    console.log('列印按鈕被點擊');
+                    printForm();
+                });
+            });
+            
+            // 初始化儲存資料表格
+            updateSavedDataTable();
+            
+            // 為搜尋功能添加事件監聽器
+            const searchInput = document.getElementById('searchInput');
+            const typeFilter = document.getElementById('typeFilter');
+            
+            if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                    updateSavedDataTable();
+                });
+            }
+            
+            if (typeFilter) {
+                typeFilter.addEventListener('change', function() {
+                    updateSavedDataTable();
+                });
+            }
+        });
+    </script>
+</body>
+</html>
